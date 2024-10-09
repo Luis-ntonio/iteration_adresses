@@ -1,37 +1,38 @@
 from get_coordinates import get_coordinates
 from itertools import combinations
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from tqdm import tqdm
 import time
 
 def validate_address(address: str, pais: str = 'Chile') -> str:
-    address_parts = address.split(" ")
+    address_parts = ' '.join(set(address.split('.')))
+    address_parts = ' '.join(set(address_parts.split(',')))
+    address_parts = ' '.join(set(address_parts.split()))
+    address_parts = address_parts.replace('DE ', '').replace('AV ', '').replace('LA ', '').replace('  ', ' ').replace('LOS ', '')
 
-    def get_validated_coordinates(val_add):
-        try:
-            coords = get_coordinates(f'{" ".join(val_add)} {pais}')
-            time.sleep(1.5)
-            if coords:
-                return " ".join(val_add), *coords
-            else:
-                return None, None, None
-        except Exception as e:
-            print(f"Error retrieving coordinates for {' '.join(val_add)}: {e}")
-            return None, None, None
+    address_parts = address_parts.split(" ")
+    iter = 3
 
     with ThreadPoolExecutor() as executor:
         futures = []
-        # Submit tasks to the thread pool for combinations
-        for i in range(len(address_parts) - 3):
-            val_addrs = combinations(address_parts, len(address_parts) - i)
+        for i in range(4, iter, -1):
+            val_addrs = combinations(address_parts, i)
+            # Submit the combinations asynchronously to the ThreadPoolExecutor
             for val_add in val_addrs:
-                futures.append(executor.submit(get_validated_coordinates, val_add))
-        
-        # Iterate over futures as they complete
-        for future in tqdm(as_completed(futures), total=len(futures)):
-            result = future.result()
-            if result[1] is not None:  # if valid coordinates are found
-                return result
+                future = executor.submit(get_coordinates, f'{" ".join(val_add)}, {pais}')
+                futures.append(future)
 
+        # Process futures as they complete
+        for future in as_completed(futures):
+            try:
+                coords = future.result()
+                if not isinstance(coords, Exception):
+                    print(coords[0], coords[1], coords[2])
+                    # Cancel remaining tasks
+                    for future in futures:
+                        future.cancel()
+                    return coords[0], coords[1], coords[2]
+            except Exception as e:
+                continue  # Handle the exception, but don't stop processing other futures
+
+    print("sin coincidencias")
     return None, None, None
-

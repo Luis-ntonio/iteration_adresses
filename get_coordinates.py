@@ -12,6 +12,7 @@ def get_coordinates(query):
         if len(response) == 0:
             raise Exception("No results found")
         lat_lon = (
+            response[0]["display_name"],
             round(float(response[0]["lat"]), 7),
             round(float(response[0]["lon"]), 7),
         )
