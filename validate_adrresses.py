@@ -39,19 +39,24 @@ def remove_duplicates_preserve_order(address):
     return cleaned_address
 
 def validate_address(address: str, pais: str = 'Chile') -> str:
-    address_parts = address
-
-    address_parts = address_parts.split(" ")
-    for i, ad in enumerate(address_parts):
-        address_parts[i] = ad.replace("_", " ")
+    address_parts = address.split(" ")
+    address_parts = [ad.replace("_", " ") for ad in address_parts]
     iter = 2
 
     with ThreadPoolExecutor(max_workers=10) as executor:
         futures = []
+
         for i in range(5, iter, -1):
             val_addrs = combinations(address_parts, i)
-            # Submit the combinations asynchronously to the ThreadPoolExecutor
-            for val_add in val_addrs:
+            
+            # Filter combinations with at least two consecutive words
+            valid_combinations = [
+                val_add for val_add in val_addrs
+                if has_consecutive_words(val_add, address_parts)
+            ]
+
+            # Submit the filtered combinations asynchronously to the ThreadPoolExecutor
+            for val_add in valid_combinations:
                 future = executor.submit(get_coordinates, f'{" ".join(val_add)}, {pais}')
                 futures.append(future)
 
@@ -61,7 +66,6 @@ def validate_address(address: str, pais: str = 'Chile') -> str:
                 coords = future.result()
                 if not isinstance(coords, Exception):
                     print(address_parts, " ------ ", address, " ------- ", coords[0])
-                    #print(coords[0], coords[1], coords[2])
                     # Cancel remaining tasks
                     for future in futures:
                         future.cancel()
@@ -71,3 +75,11 @@ def validate_address(address: str, pais: str = 'Chile') -> str:
 
     print("sin coincidencias", address_parts, " ------ ", address)
     return None, None, None
+
+
+def has_consecutive_words(combination, original_parts):
+    """
+    Check if a combination contains at least two consecutive words from the original address parts.
+    """
+    indices = [original_parts.index(word) for word in combination if word in original_parts]
+    return any(indices[i] + 1 == indices[i + 1] for i in range(len(indices) - 1))
