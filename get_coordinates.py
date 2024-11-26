@@ -15,6 +15,7 @@ def get_coordinates(query):
             response[0]["display_name"],
             round(float(response[0]["lat"]), 7),
             round(float(response[0]["lon"]), 7),
+            query,
         )
         return lat_lon
     except Exception as e:
